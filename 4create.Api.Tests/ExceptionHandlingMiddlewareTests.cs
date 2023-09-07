@@ -1,7 +1,6 @@
 using _4create.Api.Middlewares;
 using FluentValidation;
 using FluentValidation.Results;
-using Moq;
 using Xunit;
 
 namespace _4create.Api.Tests;

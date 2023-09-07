@@ -15,19 +15,12 @@ public class CreateCompanyRequestHandler: IRequestHandler<CreateCompanyCommand, 
     
     public async Task<int> Handle(CreateCompanyCommand request, CancellationToken cancellationToken)
     {
-        var company = new Company()
-        {
-            Name = request.Name
-        };
+        var company = Company.Create(request.Name);
 
         request.Employees.ForEach(employee => company.Employees.Add(
             employee.Id.HasValue
-                ? _repository.EmployeeById(employee.Id.Value)
-                : new Employee
-                {
-                    Email = employee.Email!,
-                    Title = employee.Title!.Value
-                }));
+                ? _repository.CreateEntity<Employee>(employee.Id.Value)
+                : Employee.Create(employee.Email!, employee.Title!.Value)));
         
         return await _repository.Persist(company) ?? throw new Exception("Failed to create company");
     }

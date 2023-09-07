@@ -9,7 +9,7 @@ using _4create.Infrastructure;
 
 namespace _4create.Infrastructure.Migrations
 {
-    [DbContext(typeof(Repository))]
+    [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)

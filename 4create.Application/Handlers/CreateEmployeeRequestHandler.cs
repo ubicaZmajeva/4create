@@ -12,15 +12,10 @@ public class CreateEmployeeRequestHandler: IRequestHandler<CreateEmployeeCommand
 
     public async Task<int> Handle(CreateEmployeeCommand request, CancellationToken cancellationToken)
     {
-        var employee = new Employee()
-        {
-            Email = request.Email,
-            Title = request.Title
-        };
-
+        var employee = Employee.Create(request.Email, request.Title);
         foreach (var companyId in request.CompanyIds)
         {
-            employee.Companies.Add(_repository.CompanyById(companyId));
+            employee.Companies.Add(_repository.CreateEntity<Company>(companyId));
         }
         
         return await _repository.Persist(employee) ?? throw new Exception("Failed to create employee");

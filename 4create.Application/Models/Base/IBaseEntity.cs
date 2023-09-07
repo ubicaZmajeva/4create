@@ -2,6 +2,6 @@ namespace _4create.Application.Models.Base;
 
 public interface IBaseEntity
 {
-    public int Id { get; }
-    void Timestamp(DateTime dateTime);
+    public int Id { get; set; }
+    void CreateAtTimestamp(DateTime dateTime);
 }

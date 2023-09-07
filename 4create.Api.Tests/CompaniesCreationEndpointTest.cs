@@ -2,11 +2,11 @@ using System.Net;
 using _4create.Api.Tests.IntegrationTests.Base;
 using _4create.Application;
 using _4create.Application.Enums;
+using _4create.Application.Models;
 using _4create.Infrastructure;
 using AutoFixture;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -23,17 +23,17 @@ public class CompaniesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EndpointExists()
+    public async Task CreateCompany_EndpointExists()
     {
         var result = await Client.PostAsJsonAsync("/api/companies", new {});
         Assert.NotEqual(HttpStatusCode.NotFound, result.StatusCode);
     }
 
     [Fact]
-    public async Task Success()
+    public async Task CreateCompany_Success()
     {
         using var scope = Factory.Services.CreateScope();
-        var context = (Repository)scope.ServiceProvider.GetRequiredService<IRepository>();
+        var context = (AppDbContext)scope.ServiceProvider.GetRequiredService<IRepository>();
 
         var companyName = _fixture.Create<string>();
         var result = await Client.PostAsJsonAsync("/api/companies", new
@@ -58,8 +58,8 @@ public class CompaniesEndpointTests : IntegrationTestBase
         var id = JObject.Parse(content).Value<int>("id");
         
         Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        Assert.NotNull(await context.Companies.FindAsync(id));
-        Assert.NotNull(await context.SystemLogs.Where(m => m.ResourceId == id && m.ResourceType == "Company").FirstOrDefaultAsync());
+        Assert.NotNull(await context.Set<Company>().FindAsync(id));
+        Assert.NotNull(await context.Set<SystemLog>().Where(m => m.ResourceId == id && m.ResourceType == "Company").FirstOrDefaultAsync());
     }
     
     [Theory]
@@ -160,21 +160,5 @@ public class CompaniesEndpointTests : IntegrationTestBase
         var exceptionMessages = await ExtractValidationExceptionsFromResponse(result);
         Assert.Contains(("Employees", "Duplicate employee titles are not allowed."), exceptionMessages);
         Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
-    }
-   
-
-    private static async Task<List<(string propertName, string errorMessage)>> ExtractValidationExceptionsFromResponse(HttpResponseMessage result)
-    {
-        var responseJson = await result.Content.ReadAsStringAsync();
-        dynamic? dynJson = JsonConvert.DeserializeObject(responseJson);
-        var exceptions = new List<(string propertName, string errorMessage)>();
-        if (dynJson == null) 
-            return exceptions;
-        
-        foreach (var item in dynJson["validationErrors"])
-        {
-            exceptions.Add((item.Property, item.Error));
-        }
-        return exceptions;
     }
 }

@@ -11,8 +11,8 @@ public class SystemLog: IBaseEntity
     public string ResourceAttributes { get; set; } = null!;
     public string Comment { get; set; } = null!;
     
-    public DateTime CreatedAt { get; set; }
-    public void Timestamp(DateTime dateTime)
+    public DateTime CreatedAt { get; internal set; }
+    public void CreateAtTimestamp(DateTime dateTime)
     {
         CreatedAt = CreatedAt != default 
             ? CreatedAt 

@@ -3,6 +3,7 @@ using _4create.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace _4create.Api.Tests.IntegrationTests.Base;
@@ -18,7 +19,7 @@ public abstract class IntegrationTestBase : IClassFixture<WebApplicationFactory<
             .WithWebHostBuilder(builder => builder
                 .ConfigureServices(services =>
                 {
-                    var context = services.FirstOrDefault(descriptor => descriptor.ServiceType == typeof(Repository));
+                    var context = services.FirstOrDefault(descriptor => descriptor.ServiceType == typeof(AppDbContext));
                     if (context != null)
                     {
                         services.Remove(context);
@@ -34,12 +35,28 @@ public abstract class IntegrationTestBase : IClassFixture<WebApplicationFactory<
                         }
                     }
 
-                    services.AddDbContext<IRepository, Repository>(options =>
+                    services.AddDbContext<IRepository, AppDbContext>(options =>
                         options.UseInMemoryDatabase("InMemoryDbForTesting")
                             .ConfigureWarnings(x => x.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                     );
                 }));
         
         Client = Factory.CreateClient();
+    }
+    
+
+    protected static async Task<List<(string propertName, string errorMessage)>> ExtractValidationExceptionsFromResponse(HttpResponseMessage result)
+    {
+        var responseJson = await result.Content.ReadAsStringAsync();
+        dynamic? dynJson = JsonConvert.DeserializeObject(responseJson);
+        var exceptions = new List<(string propertName, string errorMessage)>();
+        if (dynJson == null) 
+            return exceptions;
+        
+        foreach (var item in dynJson["validationErrors"])
+        {
+            exceptions.Add((item.Property, item.Error));
+        }
+        return exceptions;
     }
 }

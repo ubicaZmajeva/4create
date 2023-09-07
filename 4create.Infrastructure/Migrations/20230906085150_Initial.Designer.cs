@@ -10,7 +10,7 @@ using _4create.Infrastructure;
 
 namespace _4create.Infrastructure.Migrations
 {
-    [DbContext(typeof(Repository))]
+    [DbContext(typeof(AppDbContext))]
     [Migration("20230906085150_Initial")]
     partial class Initial
     {

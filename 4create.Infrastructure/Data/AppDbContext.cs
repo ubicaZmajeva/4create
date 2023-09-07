@@ -8,28 +8,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace _4create.Infrastructure;
 
-public partial class Repository: DbContext, IRepository
+public class AppDbContext: DbContext, IRepository
 {
-    public virtual DbSet<Company> Companies { get; set; } = null!;
-    public virtual DbSet<Employee> Employees { get; set; } = null!;
-    public virtual DbSet<SystemLog> SystemLogs { get; set; } = null!;
-
-    public Repository(DbContextOptions<Repository> options): base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(Repository).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 
     async Task<int?> IRepository.Persist<T>(T entity)
     {
+        var now = DateTime.Now;
         await using var dbContextTransaction = await Database.BeginTransactionAsync();
         try
         {
-            var now = DateTime.Now;
-
-            var auditLogs = await SaveEntity(entity, now);
-            await SaveSystemLogs(auditLogs, now);
+            var systemLogs = await SaveEntity(entity, now);
+            await SaveSystemLogs(systemLogs, now);
             
             await dbContextTransaction.CommitAsync();
             return entity.Id;
@@ -45,11 +42,13 @@ public partial class Repository: DbContext, IRepository
     {
         await AddAsync(entity);
         AddCreatedAt(now);
-        var securityLogs = AddSecurityLogs();
+        var systemLogs = AddSystemLogs();
         await SaveChangesAsync();
-        return securityLogs;
+        return systemLogs;
     }
 
+    #region SystemLogs
+    
     private void AddCreatedAt(DateTime now)
     { 
         var entities = ChangeTracker
@@ -58,12 +57,11 @@ public partial class Repository: DbContext, IRepository
 
         foreach (var entity in entities)
         {
-            if (entity.State == EntityState.Added)
-                ((IBaseEntity)entity.Entity).Timestamp(now);
+            ((IBaseEntity)entity.Entity).CreateAtTimestamp(now);
         }
     }
 
-    private IEnumerable<SystemLogWithEntity> AddSecurityLogs() =>
+    private IEnumerable<SystemLogWithEntity> AddSystemLogs() =>
         ChangeTracker
             .Entries()
             .Where(x => x is { Entity: IAuditEntity , State: EntityState.Added or EntityState.Modified or EntityState.Deleted})
@@ -88,14 +86,12 @@ public partial class Repository: DbContext, IRepository
             })
             .ToList();
 
-    private async Task SaveSystemLogs(IEnumerable<SystemLogWithEntity> auditLogs, DateTime now)
+    private async Task SaveSystemLogs(IEnumerable<SystemLogWithEntity> systemLogs, DateTime now)
     {
-        var systemLogs = auditLogs.Select(m => m.PutResourceId()).ToList();
-        await AddRangeAsync(systemLogs);
+        await AddRangeAsync(systemLogs.Select(m => m.PutResourceId()).ToList());
         AddCreatedAt(now);
         await SaveChangesAsync();
     }
-
     private class SystemLogWithEntity : SystemLog
     {
         public IAuditEntity Entity { private get; init; } = null!;
@@ -106,5 +102,49 @@ public partial class Repository: DbContext, IRepository
             return this;
         }
     }
+    
+    #endregion SystemLogs
+    
+    #region Queries
+    
+    public async Task<bool> EmployeeWithIdExists(string email, CancellationToken cancellationToken) => 
+        await Set<Employee>()
+            .AnyAsync(x => x.Email == email, cancellationToken);
+
+    public async Task<bool> CompanyWithIdExists(CancellationToken cancellationToken, params int[] companyIds) => 
+        await Set<Company>()
+            .Where(m => companyIds.Contains(m.Id))
+            .CountAsync(cancellationToken) == companyIds.Length;
+
+    public async Task<bool> EmptyPositionInCompany(CancellationToken cancellationToken, Titles title, params int[] companyIds) =>
+        !await Set<Company>()
+            .Where(m => companyIds.Contains(m.Id))
+            .SelectMany(m => m.Employees)
+            .AnyAsync(m => m.Title == title, cancellationToken: cancellationToken);
+
+    public async Task<bool> CompanyWithNameExists(CancellationToken cancellationToken, string name) => 
+        await Set<Company>()
+            .AnyAsync(x => x.Name == name, cancellationToken);
+
+    public async Task<IEnumerable<Titles>> FetchTitlesForEmployees(CancellationToken cancellationToken, params int[] employeeIds) => 
+        await Set<Employee>()
+            .Where(m => employeeIds.Contains(m.Id))
+            .Select(m => m.Title)
+            .ToListAsync(cancellationToken);
+
+    #endregion
+    
+    #region Entity Factory
+    public T CreateEntity<T>(int id) where T : class, IBaseEntity, new()
+    {
+        var entry = Entry(new T
+        {
+            Id = id
+        });
+        entry.State = EntityState.Unchanged;
+        return entry.Entity;
+    }
+    #endregion
+
 
 }
