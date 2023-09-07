@@ -1,0 +1,30 @@
+﻿services:
+  
+  4create.db:
+    image: biarms/mysql:5.7
+    container_name: 4create.db
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'db'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3306:3306'
+    expose:
+      - '3306'
+
+  4create.api:
+    image: 4create.api
+    container_name: 4create.api
+    build:
+      context: .
+      dockerfile: 4create.Api/Dockerfile
+    environment:
+      - ConnectionStrings:AppDbContext=server=4create.db;port=3306;database=db;user=user;password=password
+    depends_on:
+      - 4create.db
+    ports:
+      - '9000:80'
+    expose:
+      - '80'
